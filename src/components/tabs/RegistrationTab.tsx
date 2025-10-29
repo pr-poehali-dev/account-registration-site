@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -6,14 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
-
-interface RegistrationTask {
-  id: string;
-  email: string;
-  proxy: string;
-  status: 'waiting' | 'processing' | 'completed' | 'failed';
-  createdAt: Date;
-}
+import { api, RegistrationTask } from '@/lib/api';
 
 export const RegistrationTab = () => {
   const [tasks, setTasks] = useState<RegistrationTask[]>([]);
@@ -21,39 +14,58 @@ export const RegistrationTab = () => {
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
 
-  const startRegistration = () => {
-    if (tasks.length === 0) {
-      const mockTasks: RegistrationTask[] = [
-        { id: '1', email: 'test1@gmail.com', proxy: '192.168.1.1:8080', status: 'waiting', createdAt: new Date() },
-        { id: '2', email: 'test2@gmail.com', proxy: '192.168.1.2:8080', status: 'waiting', createdAt: new Date() },
-        { id: '3', email: 'test3@gmail.com', proxy: '192.168.1.3:8080', status: 'waiting', createdAt: new Date() },
-      ];
-      setTasks(mockTasks);
+  useEffect(() => {
+    loadTasks();
+  }, []);
+
+  const loadTasks = async () => {
+    try {
+      const data = await api.registration.getTasks();
+      setTasks(data);
+    } catch (error) {
+      toast({
+        title: 'Ошибка загрузки',
+        description: 'Не удалось загрузить задачи',
+        variant: 'destructive',
+      });
     }
+  };
 
-    setIsRunning(true);
-    setProgress(0);
+  const startRegistration = async () => {
+    try {
+      const result = await api.registration.start();
+      await loadTasks();
+      
+      setIsRunning(true);
+      setProgress(0);
 
-    toast({
-      title: 'Регистрация запущена',
-      description: 'Начинаем создание аккаунтов Marktplaats',
-    });
+      toast({
+        title: 'Регистрация запущена',
+        description: `Создано ${result.tasksCreated} задач`,
+      });
 
-    let currentProgress = 0;
-    const interval = setInterval(() => {
-      currentProgress += 10;
-      setProgress(currentProgress);
+      let currentProgress = 0;
+      const interval = setInterval(async () => {
+        currentProgress += 10;
+        setProgress(currentProgress);
 
-      if (currentProgress >= 100) {
-        clearInterval(interval);
-        setIsRunning(false);
-        setTasks(prev => prev.map(task => ({ ...task, status: 'completed' as const })));
-        toast({
-          title: 'Регистрация завершена',
-          description: 'Все аккаунты успешно созданы',
-        });
-      }
-    }, 1000);
+        if (currentProgress >= 100) {
+          clearInterval(interval);
+          setIsRunning(false);
+          await loadTasks();
+          toast({
+            title: 'Регистрация завершена',
+            description: 'Все аккаунты обработаны',
+          });
+        }
+      }, 1000);
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось запустить регистрацию',
+        variant: 'destructive',
+      });
+    }
   };
 
   const stopRegistration = () => {
@@ -163,8 +175,8 @@ export const RegistrationTab = () => {
               <TableBody>
                 {tasks.map((task) => (
                   <TableRow key={task.id}>
-                    <TableCell className="font-medium">{task.email}</TableCell>
-                    <TableCell>{task.proxy}</TableCell>
+                    <TableCell className="font-medium">{task.email || 'N/A'}</TableCell>
+                    <TableCell>{task.proxy || 'N/A'}</TableCell>
                     <TableCell>
                       <Badge
                         variant={
@@ -177,14 +189,14 @@ export const RegistrationTab = () => {
                             : 'outline'
                         }
                       >
-                        {task.status === 'waiting' && 'Ожидание'}
+                        {task.status === 'pending' && 'Ожидание'}
                         {task.status === 'processing' && 'Обработка'}
                         {task.status === 'completed' && 'Завершено'}
                         {task.status === 'failed' && 'Ошибка'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {task.createdAt.toLocaleTimeString()}
+                      {new Date(task.createdAt).toLocaleString()}
                     </TableCell>
                   </TableRow>
                 ))}

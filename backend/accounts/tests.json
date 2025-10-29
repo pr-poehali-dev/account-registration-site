@@ -1,0 +1,29 @@
+{
+  "tests": [
+    {
+      "name": "Get accounts list",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "accounts": "array"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Add accounts",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "accounts": [
+          {"email": "test@gmail.com", "password": "pass123"}
+        ]
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

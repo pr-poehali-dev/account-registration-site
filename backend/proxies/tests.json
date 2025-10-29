@@ -1,0 +1,29 @@
+{
+  "tests": [
+    {
+      "name": "Get proxies list",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "proxies": "array"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Add proxies",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "proxies": [
+          {"host": "192.168.1.1", "port": "8080"}
+        ]
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

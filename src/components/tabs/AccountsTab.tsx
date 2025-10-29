@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -6,52 +6,85 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
-
-interface GoogleAccount {
-  id: string;
-  email: string;
-  password: string;
-  status: 'ready' | 'in_use' | 'failed';
-}
+import { api, GoogleAccount } from '@/lib/api';
 
 export const AccountsTab = () => {
   const [accounts, setAccounts] = useState<GoogleAccount[]>([]);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    loadAccounts();
+  }, []);
+
+  const loadAccounts = async () => {
+    setLoading(true);
+    try {
+      const data = await api.accounts.getAll();
+      setAccounts(data);
+    } catch (error) {
+      toast({
+        title: 'Ошибка загрузки',
+        description: 'Не удалось загрузить аккаунты',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const text = e.target?.result as string;
       const lines = text.split('\n').filter(line => line.trim());
       
-      const newAccounts: GoogleAccount[] = lines.map((line, index) => {
-        const [email, password] = line.split(':');
-        return {
-          id: `acc-${Date.now()}-${index}`,
-          email: email?.trim() || '',
-          password: password?.trim() || '',
-          status: 'ready' as const,
-        };
-      }).filter(acc => acc.email && acc.password);
+      const newAccounts: { email: string; password: string }[] = lines
+        .map(line => {
+          const [email, password] = line.split(':');
+          return {
+            email: email?.trim() || '',
+            password: password?.trim() || '',
+          };
+        })
+        .filter(acc => acc.email && acc.password);
 
-      setAccounts(prev => [...prev, ...newAccounts]);
-      toast({
-        title: 'Аккаунты загружены',
-        description: `Добавлено ${newAccounts.length} аккаунтов`,
-      });
+      try {
+        await api.accounts.add(newAccounts);
+        await loadAccounts();
+        toast({
+          title: 'Аккаунты загружены',
+          description: `Добавлено ${newAccounts.length} аккаунтов`,
+        });
+      } catch (error) {
+        toast({
+          title: 'Ошибка',
+          description: 'Не удалось добавить аккаунты',
+          variant: 'destructive',
+        });
+      }
     };
     reader.readAsText(file);
   };
 
-  const deleteAccount = (id: string) => {
-    setAccounts(prev => prev.filter(acc => acc.id !== id));
-    toast({
-      title: 'Аккаунт удален',
-      variant: 'destructive',
-    });
+  const deleteAccount = async (id: number) => {
+    try {
+      await api.accounts.delete(id);
+      await loadAccounts();
+      toast({
+        title: 'Аккаунт удален',
+        variant: 'destructive',
+      });
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось удалить аккаунт',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -88,7 +121,12 @@ export const AccountsTab = () => {
           <CardTitle>Список аккаунтов</CardTitle>
         </CardHeader>
         <CardContent>
-          {accounts.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Icon name="Loader" size={48} className="mx-auto mb-4 opacity-50 animate-spin" />
+              <p>Загрузка...</p>
+            </div>
+          ) : accounts.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Icon name="Users" size={48} className="mx-auto mb-4 opacity-50" />
               <p>Аккаунты не загружены</p>
@@ -98,8 +136,8 @@ export const AccountsTab = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Email</TableHead>
-                  <TableHead>Пароль</TableHead>
                   <TableHead>Статус</TableHead>
+                  <TableHead>Дата добавления</TableHead>
                   <TableHead className="w-[100px]">Действия</TableHead>
                 </TableRow>
               </TableHeader>
@@ -107,21 +145,23 @@ export const AccountsTab = () => {
                 {accounts.map((account) => (
                   <TableRow key={account.id}>
                     <TableCell className="font-medium">{account.email}</TableCell>
-                    <TableCell>{'•'.repeat(8)}</TableCell>
                     <TableCell>
                       <Badge
                         variant={
-                          account.status === 'ready'
+                          account.status === 'active'
                             ? 'default'
                             : account.status === 'in_use'
                             ? 'secondary'
                             : 'destructive'
                         }
                       >
-                        {account.status === 'ready' && 'Готов'}
+                        {account.status === 'active' && 'Готов'}
                         {account.status === 'in_use' && 'Используется'}
                         {account.status === 'failed' && 'Ошибка'}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(account.createdAt).toLocaleString()}
                     </TableCell>
                     <TableCell>
                       <Button

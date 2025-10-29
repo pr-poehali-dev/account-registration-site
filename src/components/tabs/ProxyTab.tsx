@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -6,71 +6,106 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
-
-interface Proxy {
-  id: string;
-  host: string;
-  port: string;
-  username?: string;
-  password?: string;
-  status: 'active' | 'checking' | 'failed';
-}
+import { api, Proxy } from '@/lib/api';
 
 export const ProxyTab = () => {
   const [proxies, setProxies] = useState<Proxy[]>([]);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    loadProxies();
+  }, []);
+
+  const loadProxies = async () => {
+    setLoading(true);
+    try {
+      const data = await api.proxies.getAll();
+      setProxies(data);
+    } catch (error) {
+      toast({
+        title: 'Ошибка загрузки',
+        description: 'Не удалось загрузить прокси',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const text = e.target?.result as string;
       const lines = text.split('\n').filter(line => line.trim());
       
-      const newProxies: Proxy[] = lines.map((line, index) => {
-        const parts = line.split(':');
-        if (parts.length >= 2) {
-          return {
-            id: `proxy-${Date.now()}-${index}`,
-            host: parts[0].trim(),
-            port: parts[1].trim(),
-            username: parts[2]?.trim(),
-            password: parts[3]?.trim(),
-            status: 'active' as const,
-          };
-        }
-        return null;
-      }).filter((proxy): proxy is Proxy => proxy !== null);
+      const newProxies: { host: string; port: string; username?: string; password?: string }[] = lines
+        .map(line => {
+          const parts = line.split(':');
+          if (parts.length >= 2) {
+            return {
+              host: parts[0].trim(),
+              port: parts[1].trim(),
+              username: parts[2]?.trim(),
+              password: parts[3]?.trim(),
+            };
+          }
+          return null;
+        })
+        .filter((proxy): proxy is { host: string; port: string; username?: string; password?: string } => proxy !== null);
 
-      setProxies(prev => [...prev, ...newProxies]);
-      toast({
-        title: 'Прокси загружены',
-        description: `Добавлено ${newProxies.length} прокси-серверов`,
-      });
+      try {
+        await api.proxies.add(newProxies);
+        await loadProxies();
+        toast({
+          title: 'Прокси загружены',
+          description: `Добавлено ${newProxies.length} прокси-серверов`,
+        });
+      } catch (error) {
+        toast({
+          title: 'Ошибка',
+          description: 'Не удалось добавить прокси',
+          variant: 'destructive',
+        });
+      }
     };
     reader.readAsText(file);
   };
 
-  const deleteProxy = (id: string) => {
-    setProxies(prev => prev.filter(proxy => proxy.id !== id));
-    toast({
-      title: 'Прокси удален',
-      variant: 'destructive',
-    });
+  const deleteProxy = async (id: number) => {
+    try {
+      await api.proxies.delete(id);
+      await loadProxies();
+      toast({
+        title: 'Прокси удален',
+        variant: 'destructive',
+      });
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось удалить прокси',
+        variant: 'destructive',
+      });
+    }
   };
 
-  const testProxy = (id: string) => {
-    setProxies(prev => prev.map(proxy => 
-      proxy.id === id ? { ...proxy, status: 'checking' as const } : proxy
-    ));
-
-    setTimeout(() => {
-      setProxies(prev => prev.map(proxy => 
-        proxy.id === id ? { ...proxy, status: Math.random() > 0.3 ? 'active' as const : 'failed' as const } : proxy
-      ));
-    }, 2000);
+  const testProxy = async (id: number) => {
+    try {
+      await api.proxies.test(id);
+      await loadProxies();
+      toast({
+        title: 'Проверка завершена',
+      });
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось проверить прокси',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -107,7 +142,12 @@ export const ProxyTab = () => {
           <CardTitle>Список прокси</CardTitle>
         </CardHeader>
         <CardContent>
-          {proxies.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Icon name="Loader" size={48} className="mx-auto mb-4 opacity-50 animate-spin" />
+              <p>Загрузка...</p>
+            </div>
+          ) : proxies.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Icon name="Globe" size={48} className="mx-auto mb-4 opacity-50" />
               <p>Прокси не загружены</p>

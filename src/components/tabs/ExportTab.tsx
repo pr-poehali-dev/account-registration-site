@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -6,92 +6,62 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
-
-interface ExportAccount {
-  email: string;
-  password: string;
-  marktplaatsLogin: string;
-  marktplaatsPassword: string;
-  proxy: string;
-}
+import { api } from '@/lib/api';
 
 export const ExportTab = () => {
   const [format, setFormat] = useState<string>('csv');
   const [includeProxy, setIncludeProxy] = useState(true);
   const [includeGoogle, setIncludeGoogle] = useState(true);
+  const [accountsCount, setAccountsCount] = useState(0);
   const { toast } = useToast();
 
-  const mockAccounts: ExportAccount[] = [
-    {
-      email: 'test1@gmail.com',
-      password: 'pass123',
-      marktplaatsLogin: 'user1_markt',
-      marktplaatsPassword: 'markt_pass1',
-      proxy: '192.168.1.1:8080',
-    },
-    {
-      email: 'test2@gmail.com',
-      password: 'pass456',
-      marktplaatsLogin: 'user2_markt',
-      marktplaatsPassword: 'markt_pass2',
-      proxy: '192.168.1.2:8080',
-    },
-  ];
+  useEffect(() => {
+    loadAccountsCount();
+  }, []);
 
-  const exportAccounts = () => {
-    let content = '';
-    
-    if (format === 'csv') {
-      const headers = ['Marktplaats Login', 'Marktplaats Password'];
-      if (includeGoogle) headers.push('Google Email', 'Google Password');
-      if (includeProxy) headers.push('Proxy');
-      
-      content = headers.join(',') + '\n';
-      
-      mockAccounts.forEach(acc => {
-        const row = [acc.marktplaatsLogin, acc.marktplaatsPassword];
-        if (includeGoogle) row.push(acc.email, acc.password);
-        if (includeProxy) row.push(acc.proxy);
-        content += row.join(',') + '\n';
-      });
-    } else if (format === 'txt') {
-      mockAccounts.forEach(acc => {
-        content += `Marktplaats: ${acc.marktplaatsLogin}:${acc.marktplaatsPassword}`;
-        if (includeGoogle) content += ` | Google: ${acc.email}:${acc.password}`;
-        if (includeProxy) content += ` | Proxy: ${acc.proxy}`;
-        content += '\n';
-      });
-    } else if (format === 'json') {
-      const exportData = mockAccounts.map(acc => ({
-        marktplaats: {
-          login: acc.marktplaatsLogin,
-          password: acc.marktplaatsPassword,
-        },
-        ...(includeGoogle && {
-          google: {
-            email: acc.email,
-            password: acc.password,
-          },
-        }),
-        ...(includeProxy && { proxy: acc.proxy }),
-      }));
-      content = JSON.stringify(exportData, null, 2);
+  const loadAccountsCount = async () => {
+    try {
+      const data = await api.export.getAccounts('json', true, true);
+      setAccountsCount(data.accounts?.length || 0);
+    } catch (error) {
+      console.error('Failed to load accounts count:', error);
     }
+  };
 
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `marktplaats_accounts.${format}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const exportAccounts = async () => {
+    try {
+      const data = await api.export.getAccounts(format, includeGoogle, includeProxy);
+      
+      let content = '';
+      const filename = `marktplaats_accounts.${format}`;
+      
+      if (format === 'json') {
+        content = JSON.stringify(data.accounts, null, 2);
+      } else {
+        content = data;
+      }
 
-    toast({
-      title: 'Экспорт выполнен',
-      description: `Файл сохранен как marktplaats_accounts.${format}`,
-    });
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Экспорт выполнен',
+        description: `Файл сохранен как ${filename}`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось экспортировать аккаунты',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -110,11 +80,11 @@ export const ExportTab = () => {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Всего аккаунтов</span>
-              <span className="text-2xl font-bold">{mockAccounts.length}</span>
+              <span className="text-2xl font-bold">{accountsCount}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Готовы к экспорту</span>
-              <span className="text-2xl font-bold text-primary">{mockAccounts.length}</span>
+              <span className="text-2xl font-bold text-primary">{accountsCount}</span>
             </div>
           </CardContent>
         </Card>
@@ -126,12 +96,14 @@ export const ExportTab = () => {
           </CardHeader>
           <CardContent>
             <div className="bg-muted p-4 rounded-lg font-mono text-sm break-all">
-              {mockAccounts.length > 0 && (
+              {accountsCount > 0 ? (
                 <>
-                  {mockAccounts[0].marktplaatsLogin}:{mockAccounts[0].marktplaatsPassword}
-                  {includeGoogle && ` | ${mockAccounts[0].email}:${mockAccounts[0].password}`}
-                  {includeProxy && ` | ${mockAccounts[0].proxy}`}
+                  login:password
+                  {includeGoogle && ' | email@gmail.com:pass'}
+                  {includeProxy && ' | 192.168.1.1:8080'}
                 </>
+              ) : (
+                'Нет данных для экспорта'
               )}
             </div>
           </CardContent>
@@ -188,10 +160,10 @@ export const ExportTab = () => {
             onClick={exportAccounts}
             className="w-full"
             size="lg"
-            disabled={mockAccounts.length === 0}
+            disabled={accountsCount === 0}
           >
             <Icon name="Download" size={20} className="mr-2" />
-            Экспортировать {mockAccounts.length} аккаунтов
+            Экспортировать {accountsCount} аккаунтов
           </Button>
         </CardContent>
       </Card>

@@ -1,0 +1,17 @@
+{
+  "tests": [
+    {
+      "name": "Export accounts as JSON",
+      "method": "GET",
+      "path": "/",
+      "queryParams": {
+        "format": "json"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "accounts": "array"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
