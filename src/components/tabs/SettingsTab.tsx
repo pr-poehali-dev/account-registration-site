@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -7,33 +7,91 @@ import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
+import { api } from '@/lib/api';
 
 export const SettingsTab = () => {
   const [delayMin, setDelayMin] = useState([5]);
   const [delayMax, setDelayMax] = useState([15]);
   const [parallelTasks, setParallelTasks] = useState([3]);
+  const [maxRetries, setMaxRetries] = useState('3');
   const [autoRetry, setAutoRetry] = useState(true);
   const [useRandomDelay, setUseRandomDelay] = useState(true);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const saveSettings = () => {
-    toast({
-      title: 'Настройки сохранены',
-      description: 'Изменения успешно применены',
-    });
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    setLoading(true);
+    try {
+      const settings = await api.settings.getAll();
+      
+      if (settings.delay_min) setDelayMin([parseInt(settings.delay_min)]);
+      if (settings.delay_max) setDelayMax([parseInt(settings.delay_max)]);
+      if (settings.parallel_threads) setParallelTasks([parseInt(settings.parallel_threads)]);
+      if (settings.max_retries) setMaxRetries(settings.max_retries);
+      if (settings.auto_retry) setAutoRetry(settings.auto_retry === 'true');
+      if (settings.use_random_delay) setUseRandomDelay(settings.use_random_delay === 'true');
+    } catch (error) {
+      toast({
+        title: 'Ошибка загрузки',
+        description: 'Не удалось загрузить настройки',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const resetSettings = () => {
+  const saveSettings = async () => {
+    try {
+      await api.settings.update({
+        delay_min: delayMin[0].toString(),
+        delay_max: delayMax[0].toString(),
+        parallel_threads: parallelTasks[0].toString(),
+        max_retries: maxRetries,
+        auto_retry: autoRetry.toString(),
+        use_random_delay: useRandomDelay.toString(),
+      });
+      
+      toast({
+        title: 'Настройки сохранены',
+        description: 'Изменения успешно применены',
+      });
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось сохранить настройки',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const resetSettings = async () => {
     setDelayMin([5]);
     setDelayMax([15]);
     setParallelTasks([3]);
+    setMaxRetries('3');
     setAutoRetry(true);
     setUseRandomDelay(true);
+    
+    await saveSettings();
+    
     toast({
       title: 'Настройки сброшены',
       description: 'Восстановлены значения по умолчанию',
     });
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Icon name="Loader" size={48} className="animate-spin opacity-50" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -137,7 +195,13 @@ export const SettingsTab = () => {
 
           <div className="space-y-2">
             <Label>Максимум попыток</Label>
-            <Input type="number" defaultValue="3" min="1" max="10" />
+            <Input 
+              type="number" 
+              value={maxRetries}
+              onChange={(e) => setMaxRetries(e.target.value)}
+              min="1" 
+              max="10" 
+            />
           </div>
         </CardContent>
       </Card>
@@ -150,7 +214,7 @@ export const SettingsTab = () => {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Префикс имени пользователя</Label>
-            <Input placeholder="user_" />
+            <Input placeholder="user_" defaultValue="user_" />
             <p className="text-sm text-muted-foreground">
               Будет добавлен перед сгенерированным именем
             </p>

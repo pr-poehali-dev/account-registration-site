@@ -1,0 +1,30 @@
+{
+  "tests": [
+    {
+      "name": "Get settings",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "settings": "object"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Update settings",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "settings": {
+          "delay_min": "10",
+          "parallel_threads": "5"
+        }
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

@@ -38,7 +38,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             SELECT 
                 rt.marktplaats_login, rt.marktplaats_password,
                 ga.email, ga.password,
-                p.host, p.port, p.username, p.password
+                p.host, p.port, p.username, p.password,
+                rt.cookies_data
             FROM t_p24911867_account_registration.registration_tasks rt
             LEFT JOIN t_p24911867_account_registration.google_accounts ga ON rt.google_account_id = ga.id
             LEFT JOIN t_p24911867_account_registration.proxies p ON rt.proxy_id = p.id
@@ -61,6 +62,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 account['proxy'] = f'{row[4]}:{row[5]}' if row[4] else None
                 if row[6]:
                     account['proxy_auth'] = f'{row[6]}:{row[7]}'
+            if row[8]:
+                account['cookies'] = row[8]
             accounts.append(account)
         
         if export_format == 'csv':
@@ -99,6 +102,27 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'Content-Type': 'text/plain',
                     'Access-Control-Allow-Origin': '*',
                     'Content-Disposition': 'attachment; filename="marktplaats_accounts.txt"'
+                },
+                'isBase64Encoded': False,
+                'body': content
+            }
+        
+        elif export_format == 'cookies':
+            cookies_list = []
+            for acc in accounts:
+                if acc.get('cookies'):
+                    cookies_list.append({
+                        'login': acc['marktplaats_login'],
+                        'cookies': acc['cookies']
+                    })
+            content = json.dumps(cookies_list, indent=2)
+            
+            return {
+                'statusCode': 200,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                    'Content-Disposition': 'attachment; filename="marktplaats_cookies.json"'
                 },
                 'isBase64Encoded': False,
                 'body': content

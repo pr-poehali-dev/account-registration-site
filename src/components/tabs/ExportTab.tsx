@@ -33,10 +33,13 @@ export const ExportTab = () => {
       const data = await api.export.getAccounts(format, includeGoogle, includeProxy);
       
       let content = '';
-      const filename = `marktplaats_accounts.${format}`;
+      let filename = `marktplaats_accounts.${format}`;
       
       if (format === 'json') {
         content = JSON.stringify(data.accounts, null, 2);
+      } else if (format === 'cookies') {
+        content = JSON.stringify(data, null, 2);
+        filename = 'marktplaats_cookies.json';
       } else {
         content = data;
       }
@@ -126,35 +129,47 @@ export const ExportTab = () => {
                 <SelectItem value="csv">CSV (Excel)</SelectItem>
                 <SelectItem value="txt">TXT (текстовый файл)</SelectItem>
                 <SelectItem value="json">JSON</SelectItem>
+                <SelectItem value="cookies">Cookies (JSON)</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <div className="space-y-4">
-            <Label>Включить в экспорт</Label>
-            <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="google"
-                  checked={includeGoogle}
-                  onCheckedChange={(checked) => setIncludeGoogle(checked as boolean)}
-                />
-                <Label htmlFor="google" className="cursor-pointer">
-                  Google аккаунты (email и пароль)
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="proxy"
-                  checked={includeProxy}
-                  onCheckedChange={(checked) => setIncludeProxy(checked as boolean)}
-                />
-                <Label htmlFor="proxy" className="cursor-pointer">
-                  Прокси-серверы
-                </Label>
+          {format !== 'cookies' && (
+            <div className="space-y-4">
+              <Label>Включить в экспорт</Label>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="google"
+                    checked={includeGoogle}
+                    onCheckedChange={(checked) => setIncludeGoogle(checked as boolean)}
+                  />
+                  <Label htmlFor="google" className="cursor-pointer">
+                    Google аккаунты (email и пароль)
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="proxy"
+                    checked={includeProxy}
+                    onCheckedChange={(checked) => setIncludeProxy(checked as boolean)}
+                  />
+                  <Label htmlFor="proxy" className="cursor-pointer">
+                    Прокси-серверы
+                  </Label>
+                </div>
               </div>
             </div>
-          </div>
+          )}
+          
+          {format === 'cookies' && (
+            <div className="bg-muted p-4 rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                <Icon name="Info" size={16} className="inline mr-2" />
+                Экспорт cookies включает только авторизационные данные браузера для быстрого входа
+              </p>
+            </div>
+          )}
 
           <Button
             onClick={exportAccounts}

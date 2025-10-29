@@ -3,6 +3,7 @@ const API_URLS = {
   proxies: 'https://functions.poehali.dev/d3f6e601-e2d0-4a71-970d-b1fb53625abf',
   registration: 'https://functions.poehali.dev/8a55c82d-1f31-44ed-80bb-d6e3e8044d20',
   export: 'https://functions.poehali.dev/0a663b4b-88d4-44d3-86e9-cc79bed9b2a9',
+  settings: 'https://functions.poehali.dev/6e46c73e-86c4-4559-9283-3e4e1d4174fb',
 };
 
 export interface GoogleAccount {
@@ -112,10 +113,24 @@ export const api = {
       });
       const response = await fetch(`${API_URLS.export}?${params}`);
       
-      if (format === 'json') {
+      if (format === 'json' || format === 'cookies') {
         return response.json();
       }
       return response.text();
+    },
+  },
+  settings: {
+    getAll: async (): Promise<Record<string, string>> => {
+      const response = await fetch(API_URLS.settings);
+      const data = await response.json();
+      return data.settings || {};
+    },
+    update: async (settings: Record<string, string>): Promise<void> => {
+      await fetch(API_URLS.settings, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings }),
+      });
     },
   },
 };
