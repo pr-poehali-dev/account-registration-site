@@ -12,6 +12,7 @@ export const Sidebar = ({ activeTab, setActiveTab }: SidebarProps) => {
     { id: 'proxy' as TabType, label: 'Прокси', icon: 'Globe' },
     { id: 'registration' as TabType, label: 'Регистрация', icon: 'UserPlus' },
     { id: 'export' as TabType, label: 'Экспорт', icon: 'Download' },
+    { id: 'statistics' as TabType, label: 'Статистика', icon: 'BarChart3' },
     { id: 'settings' as TabType, label: 'Настройки', icon: 'Settings' },
   ];
 

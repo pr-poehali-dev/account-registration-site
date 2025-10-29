@@ -5,8 +5,9 @@ import { ProxyTab } from '@/components/tabs/ProxyTab';
 import { RegistrationTab } from '@/components/tabs/RegistrationTab';
 import { ExportTab } from '@/components/tabs/ExportTab';
 import { SettingsTab } from '@/components/tabs/SettingsTab';
+import { StatisticsTab } from '@/components/tabs/StatisticsTab';
 
-export type TabType = 'accounts' | 'proxy' | 'registration' | 'export' | 'settings';
+export type TabType = 'accounts' | 'proxy' | 'registration' | 'export' | 'statistics' | 'settings';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState<TabType>('accounts');
@@ -20,6 +21,7 @@ const Index = () => {
           {activeTab === 'proxy' && <ProxyTab />}
           {activeTab === 'registration' && <RegistrationTab />}
           {activeTab === 'export' && <ExportTab />}
+          {activeTab === 'statistics' && <StatisticsTab />}
           {activeTab === 'settings' && <SettingsTab />}
         </div>
       </main>

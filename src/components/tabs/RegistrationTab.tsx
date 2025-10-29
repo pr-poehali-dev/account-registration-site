@@ -173,27 +173,35 @@ export const RegistrationTab = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tasks.map((task) => (
-                  <TableRow key={task.id}>
+                {tasks.slice(0, 100).map((task) => (
+                  <TableRow key={task.id} className={task.status === 'failed' ? 'bg-red-500/5' : ''}>
                     <TableCell className="font-medium">{task.email || 'N/A'}</TableCell>
                     <TableCell>{task.proxy || 'N/A'}</TableCell>
                     <TableCell>
-                      <Badge
-                        variant={
-                          task.status === 'completed'
-                            ? 'default'
-                            : task.status === 'processing'
-                            ? 'secondary'
-                            : task.status === 'failed'
-                            ? 'destructive'
-                            : 'outline'
-                        }
-                      >
-                        {task.status === 'pending' && 'Ожидание'}
-                        {task.status === 'processing' && 'Обработка'}
-                        {task.status === 'completed' && 'Завершено'}
-                        {task.status === 'failed' && 'Ошибка'}
-                      </Badge>
+                      <div className="space-y-1">
+                        <Badge
+                          variant={
+                            task.status === 'completed'
+                              ? 'default'
+                              : task.status === 'processing'
+                              ? 'secondary'
+                              : task.status === 'failed'
+                              ? 'destructive'
+                              : 'outline'
+                          }
+                        >
+                          {task.status === 'pending' && 'Ожидание'}
+                          {task.status === 'processing' && 'Обработка'}
+                          {task.status === 'completed' && 'Завершено'}
+                          {task.status === 'failed' && 'Ошибка'}
+                        </Badge>
+                        {task.status === 'failed' && task.errorMessage && (
+                          <div className="flex items-center gap-1 text-xs text-red-500">
+                            <Icon name="AlertCircle" size={12} />
+                            <span>{task.errorMessage}</span>
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {new Date(task.createdAt).toLocaleString()}
@@ -202,6 +210,11 @@ export const RegistrationTab = () => {
                 ))}
               </TableBody>
             </Table>
+            {tasks.length > 100 && (
+              <p className="text-center text-sm text-muted-foreground mt-4">
+                Показано 100 из {tasks.length} задач
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
