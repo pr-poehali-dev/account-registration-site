@@ -138,8 +138,20 @@ export const ProxyTab = () => {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Список прокси</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Список прокси</CardTitle>
+            <CardDescription>Рекомендуется использовать SOCKS5 прокси</CardDescription>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={loadProxies}
+            disabled={loading}
+          >
+            <Icon name="RefreshCw" size={16} className={loading ? "animate-spin mr-2" : "mr-2"} />
+            Обновить
+          </Button>
         </CardHeader>
         <CardContent>
           {loading ? (
