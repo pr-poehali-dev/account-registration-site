@@ -115,6 +115,60 @@ export const RegistrationTab = () => {
         </Card>
       </div>
 
+      <Card className="border-blue-500/20 bg-blue-500/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Icon name="Info" size={20} className="text-blue-500" />
+            Как работает регистрация
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <div className="flex gap-3">
+            <div className="flex-shrink-0 mt-0.5">
+              <div className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold">1</div>
+            </div>
+            <div>
+              <p className="font-medium">Подготовка данных</p>
+              <p className="text-muted-foreground">Загрузите Google аккаунты и прокси-серверы, настройте параметры</p>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <div className="flex-shrink-0 mt-0.5">
+              <div className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold">2</div>
+            </div>
+            <div>
+              <p className="font-medium">Создание задач</p>
+              <p className="text-muted-foreground">Система автоматически создаёт пары: 1 Google аккаунт + 1 прокси = 1 задача</p>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <div className="flex-shrink-0 mt-0.5">
+              <div className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold">3</div>
+            </div>
+            <div>
+              <p className="font-medium">Автоматизация</p>
+              <p className="text-muted-foreground">Открывается браузер через прокси → вход в Google → регистрация на Marktplaats</p>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <div className="flex-shrink-0 mt-0.5">
+              <div className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold">4</div>
+            </div>
+            <div>
+              <p className="font-medium">Результаты</p>
+              <p className="text-muted-foreground">Успешные аккаунты сохраняются, ошибки показываются в таблице</p>
+            </div>
+          </div>
+          <div className="border-t pt-3 mt-3">
+            <p className="font-medium text-amber-600 flex items-center gap-2">
+              <Icon name="AlertTriangle" size={16} />
+              Важно: 1 прокси = 1 аккаунт
+            </p>
+            <p className="text-muted-foreground mt-1">Каждый прокси может быть использован только для регистрации одного аккаунта</p>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Управление процессом</CardTitle>

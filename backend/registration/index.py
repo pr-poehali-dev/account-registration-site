@@ -79,6 +79,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     WHERE rt.google_account_id = ga.id 
                     AND rt.status IN ('pending', 'processing', 'completed')
                 )
+                AND NOT EXISTS (
+                    SELECT 1 FROM t_p24911867_account_registration.registration_tasks rt 
+                    WHERE rt.proxy_id = p.id 
+                    AND rt.status IN ('pending', 'processing', 'completed')
+                )
                 LIMIT 10
             ''')
             pairs = cur.fetchall()
