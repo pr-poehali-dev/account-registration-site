@@ -268,50 +268,27 @@ def process_registration_real(google_email: str, google_password: str,
         add_log("BROWSERLESS", "Подключение к удаленному браузеру")
         
         if proxy_username and proxy_password:
-            proxy_extension_str = f'{proxy_username}:{proxy_password}@{proxy_host}:{proxy_port}'
+            proxy_str = f'{proxy_username}:{proxy_password}@{proxy_host}:{proxy_port}'
             add_log("BROWSERLESS", f"Прокси с авторизацией: {proxy_host}:{proxy_port}")
         else:
-            proxy_extension_str = f'{proxy_host}:{proxy_port}'
+            proxy_str = f'{proxy_host}:{proxy_port}'
             add_log("BROWSERLESS", f"Прокси без авторизации: {proxy_host}:{proxy_port}")
         
         chrome_options = webdriver.ChromeOptions()
-        chrome_options.add_argument(f'--proxy-server=socks5://{proxy_extension_str}')
+        chrome_options.set_capability('browserless:token', browserless_key)
+        chrome_options.add_argument(f'--proxy-server=socks5://{proxy_str}')
         chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--headless')
         chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
         chrome_options.add_argument('--disable-gpu')
-        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        chrome_options.add_experimental_option('useAutomationExtension', False)
+        chrome_options.add_argument('--window-size=1920,1080')
         
-        browserless_url = f'https://production-sfo.browserless.io/webdriver?token={browserless_key}&blockAds=true&stealth=true'
-        add_log("BROWSERLESS", f"Создание сессии браузера с stealth режимом")
+        add_log("BROWSERLESS", "Создание WebDriver сессии")
         
-        try:
-            driver = webdriver.Remote(
-                command_executor=browserless_url,
-                options=chrome_options
-            )
-        except Exception as e:
-            add_log("ERROR", f"Ошибка создания WebDriver: {str(e)[:150]}")
-            add_log("INFO", "Попытка без прокси для проверки подключения к Browserless")
-            
-            chrome_options_no_proxy = webdriver.ChromeOptions()
-            chrome_options_no_proxy.add_argument('--no-sandbox')
-            chrome_options_no_proxy.add_argument('--disable-dev-shm-usage')
-            
-            try:
-                driver = webdriver.Remote(
-                    command_executor=f'https://production-sfo.browserless.io/webdriver?token={browserless_key}',
-                    options=chrome_options_no_proxy
-                )
-                add_log("WARNING", "Браузер запущен БЕЗ прокси (только для теста)")
-            except Exception as e2:
-                add_log("ERROR", f"Не удалось подключиться к Browserless: {str(e2)[:150]}")
-                return {
-                    'success': False,
-                    'error': f'Ошибка подключения к Browserless: {str(e2)[:200]}',
-                    'logs': logs
-                }
+        driver = webdriver.Remote(
+            command_executor='https://chrome.browserless.io/webdriver',
+            options=chrome_options
+        )
         
         driver.set_page_load_timeout(60)
         wait = WebDriverWait(driver, 15)
