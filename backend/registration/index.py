@@ -278,10 +278,14 @@ def process_registration_real(google_email: str, google_password: str,
         chrome_options.set_capability('browserless:token', browserless_key)
         chrome_options.add_argument(f'--proxy-server=socks5://{proxy_str}')
         chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--headless')
         chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+        chrome_options.add_argument('--disable-features=IsolateOrigins,site-per-process')
         chrome_options.add_argument('--window-size=1920,1080')
+        chrome_options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+        chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
+        chrome_options.add_experimental_option('useAutomationExtension', False)
+        chrome_options.set_capability('goog:chromeOptions', {'prefs': {'profile.default_content_setting_values': {'notifications': 2}}})
         
         add_log("BROWSERLESS", "Создание WebDriver сессии")
         
@@ -290,19 +294,29 @@ def process_registration_real(google_email: str, google_password: str,
             options=chrome_options
         )
         
-        driver.set_page_load_timeout(60)
-        wait = WebDriverWait(driver, 15)
+        driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+            'source': '''
+                Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+                Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
+            '''
+        })
+        
+        driver.set_page_load_timeout(90)
+        wait = WebDriverWait(driver, 30)
         
         add_log("BROWSER", "Браузер запущен успешно")
         
         add_log("GOOGLE", "Переход на страницу входа Google")
         driver.get('https://accounts.google.com/signin')
-        time.sleep(random.uniform(2, 4))
+        time.sleep(random.uniform(3, 6))
         
         add_log("GOOGLE", "Ввод email")
         email_input = wait.until(EC.presence_of_element_located((By.ID, 'identifierId')))
-        email_input.send_keys(google_email)
-        time.sleep(random.uniform(1, 2))
+        for char in google_email:
+            email_input.send_keys(char)
+            time.sleep(random.uniform(0.1, 0.3))
+        time.sleep(random.uniform(1.5, 2.5))
         
         add_log("GOOGLE", "Клик на кнопку 'Далее'")
         next_button = driver.find_element(By.ID, 'identifierNext')
