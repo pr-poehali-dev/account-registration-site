@@ -7,6 +7,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { api, RegistrationTask } from '@/lib/api';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export const RegistrationTab = () => {
   const [tasks, setTasks] = useState<RegistrationTask[]>([]);
@@ -96,6 +105,38 @@ export const RegistrationTab = () => {
       title: 'Регистрация остановлена',
       variant: 'destructive',
     });
+  };
+
+  const deleteTask = async (taskId: number) => {
+    try {
+      await api.registration.delete(taskId);
+      await loadTasks();
+      toast({
+        title: 'Задача удалена',
+      });
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось удалить задачу',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const deleteAllTasks = async () => {
+    try {
+      await api.registration.deleteAll();
+      await loadTasks();
+      toast({
+        title: 'Все задачи удалены',
+      });
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось удалить задачи',
+        variant: 'destructive',
+      });
+    }
   };
 
   const completedCount = tasks.filter(t => t.status === 'completed').length;
@@ -236,7 +277,18 @@ export const RegistrationTab = () => {
       {tasks.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Задачи регистрации</CardTitle>
+            <div className="flex justify-between items-center">
+              <CardTitle>Задачи регистрации</CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={deleteAllTasks}
+                className="text-destructive hover:text-destructive"
+              >
+                <Icon name="Trash2" size={16} className="mr-2" />
+                Удалить все
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <Table>
@@ -246,6 +298,7 @@ export const RegistrationTab = () => {
                   <TableHead>Прокси</TableHead>
                   <TableHead>Статус</TableHead>
                   <TableHead>Время создания</TableHead>
+                  <TableHead className="text-right">Действия</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -281,6 +334,53 @@ export const RegistrationTab = () => {
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {new Date(task.createdAt).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        {task.logs && task.logs.length > 0 && (
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="outline" size="sm">
+                                <Icon name="FileText" size={16} className="mr-1" />
+                                Логи
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-2xl">
+                              <DialogHeader>
+                                <DialogTitle>Лог обработки задачи</DialogTitle>
+                                <DialogDescription>
+                                  {task.email} - {task.proxy}
+                                </DialogDescription>
+                              </DialogHeader>
+                              <ScrollArea className="h-[400px] w-full rounded-md border p-4">
+                                <div className="space-y-2 font-mono text-xs">
+                                  {task.logs.map((log, idx) => (
+                                    <div
+                                      key={idx}
+                                      className={`p-2 rounded ${
+                                        log.includes('[ERROR]')
+                                          ? 'bg-red-500/10 text-red-600'
+                                          : log.includes('[SUCCESS]')
+                                          ? 'bg-green-500/10 text-green-600'
+                                          : 'bg-muted'
+                                      }`}
+                                    >
+                                      {log}
+                                    </div>
+                                  ))}
+                                </div>
+                              </ScrollArea>
+                            </DialogContent>
+                          </Dialog>
+                        )}
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => deleteTask(task.id)}
+                        >
+                          <Icon name="Trash2" size={16} />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

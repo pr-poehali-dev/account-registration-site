@@ -34,6 +34,7 @@ export interface RegistrationTask {
   completedAt?: string;
   email?: string;
   proxy?: string;
+  logs?: string[];
 }
 
 export const api = {
@@ -109,6 +110,20 @@ export const api = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'process', taskId }),
+      });
+    },
+    delete: async (taskId: number): Promise<void> => {
+      await fetch(API_URLS.registration, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', taskId }),
+      });
+    },
+    deleteAll: async (): Promise<void> => {
+      await fetch(API_URLS.registration, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_all' }),
       });
     },
   },
