@@ -294,16 +294,14 @@ def process_registration_real(google_email: str, google_password: str,
             options=chrome_options
         )
         
-        driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
-            'source': '''
-                Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-                Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
-                Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
-            '''
-        })
-        
         driver.set_page_load_timeout(90)
         wait = WebDriverWait(driver, 30)
+        
+        driver.execute_script('''
+            Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+            Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+            Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
+        ''')
         
         add_log("BROWSER", "Браузер запущен успешно")
         
