@@ -7,6 +7,8 @@ import random
 import string
 import requests
 import time
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
+import asyncio
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     '''
@@ -210,61 +212,136 @@ def generate_password() -> str:
 def process_registration_real(google_email: str, google_password: str, 
                               proxy_host: str, proxy_port: str, proxy_username: str, proxy_password: str,
                               marktplaats_login: str, marktplaats_password: str) -> Dict[str, Any]:
+    browser = None
+    context = None
+    page = None
+    
     try:
-        session = requests.Session()
-        
-        if proxy_username and proxy_password:
-            proxy_url = f'socks5://{proxy_username}:{proxy_password}@{proxy_host}:{proxy_port}'
-        else:
-            proxy_url = f'socks5://{proxy_host}:{proxy_port}'
-        
-        proxies = {
-            'http': proxy_url,
-            'https': proxy_url
-        }
-        
-        session.proxies.update(proxies)
-        session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        })
-        
-        time.sleep(random.uniform(2, 4))
-        
-        response = session.get('https://www.marktplaats.nl', timeout=20)
-        
-        if response.status_code == 200:
-            cookies_dict = session.cookies.get_dict()
-            cookies_json = json.dumps([{'name': k, 'value': v} for k, v in cookies_dict.items()])
+        with sync_playwright() as p:
+            if proxy_username and proxy_password:
+                proxy_config = {
+                    'server': f'socks5://{proxy_host}:{proxy_port}',
+                    'username': proxy_username,
+                    'password': proxy_password
+                }
+            else:
+                proxy_config = {
+                    'server': f'socks5://{proxy_host}:{proxy_port}'
+                }
+            
+            browser = p.chromium.launch(
+                headless=True,
+                args=[
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-blink-features=AutomationControlled'
+                ]
+            )
+            
+            context = browser.new_context(
+                proxy=proxy_config,
+                viewport={'width': 1920, 'height': 1080},
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            )
+            
+            page = context.new_page()
+            page.set_default_timeout(60000)
+            
+            page.goto('https://accounts.google.com/signin', wait_until='domcontentloaded')
+            time.sleep(random.uniform(2, 4))
+            
+            email_input = page.wait_for_selector('#identifierId', timeout=15000)
+            email_input.fill(google_email)
+            time.sleep(random.uniform(1, 2))
+            
+            page.click('#identifierNext')
+            time.sleep(random.uniform(3, 5))
+            
+            try:
+                password_input = page.wait_for_selector('input[name="Passwd"]', timeout=15000)
+                password_input.fill(google_password)
+                time.sleep(random.uniform(1, 2))
+                
+                page.click('#passwordNext')
+                time.sleep(random.uniform(4, 6))
+            except PlaywrightTimeout:
+                return {
+                    'success': False,
+                    'error': 'Google требует дополнительную проверку (2FA или капча)'
+                }
+            
+            page.goto('https://www.marktplaats.nl', wait_until='domcontentloaded')
+            time.sleep(random.uniform(3, 5))
+            
+            try:
+                login_btn = page.wait_for_selector('button:has-text("Inloggen"), a:has-text("Inloggen")', timeout=10000)
+                login_btn.click()
+                time.sleep(random.uniform(2, 3))
+            except:
+                pass
+            
+            try:
+                google_btn = page.wait_for_selector('button:has-text("Google"), [aria-label*="Google"]', timeout=15000)
+                google_btn.click()
+                time.sleep(random.uniform(5, 7))
+            except PlaywrightTimeout:
+                return {
+                    'success': False,
+                    'error': 'Не найдена кнопка входа через Google на Marktplaats'
+                }
+            
+            cookies = context.cookies()
+            cookies_json = json.dumps(cookies)
+            
+            current_url = page.url
+            page_title = page.title()
+            
+            context.close()
+            browser.close()
             
             return {
                 'success': True,
                 'cookies': cookies_json,
-                'url': 'https://www.marktplaats.nl',
-                'message': f'Подключение через прокси {proxy_host}:{proxy_port} успешно. Аккаунт готов к использованию.'
+                'url': current_url,
+                'title': page_title,
+                'message': f'Регистрация завершена успешно через прокси {proxy_host}:{proxy_port}'
+            }
+            
+    except PlaywrightTimeout:
+        if context:
+            context.close()
+        if browser:
+            browser.close()
+        return {
+            'success': False,
+            'error': 'Timeout: элемент не найден или страница не загрузилась'
+        }
+    except Exception as e:
+        if context:
+            try:
+                context.close()
+            except:
+                pass
+        if browser:
+            try:
+                browser.close()
+            except:
+                pass
+        
+        error_msg = str(e)
+        if 'net::ERR_PROXY_CONNECTION_FAILED' in error_msg or 'NS_ERROR_PROXY_CONNECTION_REFUSED' in error_msg:
+            return {
+                'success': False,
+                'error': f'Proxy error: не удалось подключиться к {proxy_host}:{proxy_port}'
+            }
+        elif 'net::ERR_TIMED_OUT' in error_msg or 'Timeout' in error_msg:
+            return {
+                'success': False,
+                'error': f'Timeout: прокси {proxy_host}:{proxy_port} не отвечает'
             }
         else:
             return {
                 'success': False,
-                'error': f'HTTP {response.status_code}: не удалось подключиться к сайту'
+                'error': f'Error: {error_msg[:250]}'
             }
-        
-    except requests.exceptions.ProxyError:
-        return {
-            'success': False,
-            'error': f'Proxy error: не удалось подключиться через {proxy_host}:{proxy_port}. Проверьте прокси.'
-        }
-    except requests.exceptions.Timeout:
-        return {
-            'success': False,
-            'error': f'Timeout: превышено время ожидания подключения к прокси {proxy_host}:{proxy_port}'
-        }
-    except requests.exceptions.ConnectionError:
-        return {
-            'success': False,
-            'error': f'Connection error: прокси {proxy_host}:{proxy_port} недоступен'
-        }
-    except Exception as e:
-        return {
-            'success': False,
-            'error': f'Error: {str(e)[:200]}'
-        }
