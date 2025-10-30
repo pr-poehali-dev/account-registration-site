@@ -37,22 +37,39 @@ export interface RegistrationTask {
   logs?: string[];
 }
 
+async function fetchWithErrorHandling(url: string, options?: RequestInit): Promise<Response> {
+  try {
+    console.log(`[API] Запрос: ${options?.method || 'GET'} ${url}`);
+    const response = await fetch(url, options);
+    console.log(`[API] Ответ: ${response.status} ${response.statusText}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[API] Ошибка: ${errorText}`);
+      throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+    }
+    return response;
+  } catch (error) {
+    console.error('[API] Исключение:', error);
+    throw error;
+  }
+}
+
 export const api = {
   accounts: {
     getAll: async (): Promise<GoogleAccount[]> => {
-      const response = await fetch(API_URLS.accounts);
+      const response = await fetchWithErrorHandling(API_URLS.accounts);
       const data = await response.json();
       return data.accounts || [];
     },
     add: async (accounts: { email: string; password: string }[]): Promise<void> => {
-      await fetch(API_URLS.accounts, {
+      await fetchWithErrorHandling(API_URLS.accounts, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accounts }),
       });
     },
     test: async (id: number): Promise<{ success: boolean; message?: string }> => {
-      const response = await fetch(API_URLS.accounts, {
+      const response = await fetchWithErrorHandling(API_URLS.accounts, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
@@ -60,45 +77,45 @@ export const api = {
       return response.json();
     },
     delete: async (id: number): Promise<void> => {
-      await fetch(`${API_URLS.accounts}?id=${id}`, {
+      await fetchWithErrorHandling(`${API_URLS.accounts}?id=${id}`, {
         method: 'DELETE',
       });
     },
   },
   proxies: {
     getAll: async (): Promise<Proxy[]> => {
-      const response = await fetch(API_URLS.proxies);
+      const response = await fetchWithErrorHandling(API_URLS.proxies);
       const data = await response.json();
       return data.proxies || [];
     },
     add: async (proxies: { host: string; port: string; username?: string; password?: string }[]): Promise<void> => {
-      await fetch(API_URLS.proxies, {
+      await fetchWithErrorHandling(API_URLS.proxies, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ proxies }),
       });
     },
     test: async (id: number): Promise<void> => {
-      await fetch(API_URLS.proxies, {
+      await fetchWithErrorHandling(API_URLS.proxies, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       });
     },
     delete: async (id: number): Promise<void> => {
-      await fetch(`${API_URLS.proxies}?id=${id}`, {
+      await fetchWithErrorHandling(`${API_URLS.proxies}?id=${id}`, {
         method: 'DELETE',
       });
     },
   },
   registration: {
     getTasks: async (): Promise<RegistrationTask[]> => {
-      const response = await fetch(API_URLS.registration);
+      const response = await fetchWithErrorHandling(API_URLS.registration);
       const data = await response.json();
       return data.tasks || [];
     },
     start: async (): Promise<{ success: boolean; tasksCreated: number }> => {
-      const response = await fetch(API_URLS.registration, {
+      const response = await fetchWithErrorHandling(API_URLS.registration, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'start' }),
@@ -106,21 +123,21 @@ export const api = {
       return response.json();
     },
     process: async (taskId: number): Promise<void> => {
-      await fetch(API_URLS.registration, {
+      await fetchWithErrorHandling(API_URLS.registration, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'process', taskId }),
       });
     },
     delete: async (taskId: number): Promise<void> => {
-      await fetch(API_URLS.registration, {
+      await fetchWithErrorHandling(API_URLS.registration, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'delete', taskId }),
       });
     },
     deleteAll: async (): Promise<void> => {
-      await fetch(API_URLS.registration, {
+      await fetchWithErrorHandling(API_URLS.registration, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'delete_all' }),
@@ -134,7 +151,7 @@ export const api = {
         includeGoogle: includeGoogle.toString(),
         includeProxy: includeProxy.toString(),
       });
-      const response = await fetch(`${API_URLS.export}?${params}`);
+      const response = await fetchWithErrorHandling(`${API_URLS.export}?${params}`);
       
       if (format === 'json' || format === 'cookies') {
         return response.json();
@@ -144,12 +161,12 @@ export const api = {
   },
   settings: {
     getAll: async (): Promise<Record<string, string>> => {
-      const response = await fetch(API_URLS.settings);
+      const response = await fetchWithErrorHandling(API_URLS.settings);
       const data = await response.json();
       return data.settings || {};
     },
     update: async (settings: Record<string, string>): Promise<void> => {
-      await fetch(API_URLS.settings, {
+      await fetchWithErrorHandling(API_URLS.settings, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ settings }),
