@@ -7,6 +7,11 @@ import random
 import string
 import requests
 import time
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     '''
@@ -242,6 +247,7 @@ def process_registration_real(google_email: str, google_password: str,
                               proxy_host: str, proxy_port: str, proxy_username: str, proxy_password: str,
                               marktplaats_login: str, marktplaats_password: str) -> Dict[str, Any]:
     logs = []
+    driver = None
     
     def add_log(step: str, message: str):
         logs.append(f"[{step}] {message}")
@@ -250,52 +256,144 @@ def process_registration_real(google_email: str, google_password: str,
     try:
         add_log("INIT", f"Начало регистрации для {google_email} через {proxy_host}:{proxy_port}")
         
-        if proxy_username and proxy_password:
-            proxy_url = f'socks5://{proxy_username}:{proxy_password}@{proxy_host}:{proxy_port}'
-            add_log("PROXY", f"Подключение через прокси с авторизацией")
-        else:
-            proxy_url = f'socks5://{proxy_host}:{proxy_port}'
-            add_log("PROXY", f"Подключение через прокси без авторизации")
-        
-        proxies = {
-            'http': proxy_url,
-            'https': proxy_url
-        }
-        
-        session = requests.Session()
-        session.proxies.update(proxies)
-        session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        })
-        
-        add_log("PROXY", "Проверка подключения через прокси")
-        try:
-            response = session.get('https://api.ipify.org?format=json', timeout=10)
-            proxy_ip = response.json().get('ip')
-            add_log("PROXY", f"Подключено через IP: {proxy_ip}")
-        except Exception as e:
-            add_log("ERROR", f"Ошибка подключения к прокси: {str(e)[:100]}")
+        browserless_key = os.environ.get('BROWSERLESS_API_KEY')
+        if not browserless_key:
+            add_log("ERROR", "API ключ Browserless не найден")
             return {
                 'success': False,
-                'error': f'Не удалось подключиться к прокси {proxy_host}:{proxy_port}',
+                'error': 'BROWSERLESS_API_KEY не настроен в секретах',
                 'logs': logs
             }
         
-        add_log("BROWSER", "Инициализация автоматизации")
-        add_log("INFO", "⚠️ Для полной автоматизации требуется браузер (Playwright/Selenium)")
-        add_log("INFO", "Cloud Functions не поддерживают браузерную автоматизацию")
-        add_log("INFO", "Решение: запустить локальный сервис автоматизации или использовать Browserless")
+        add_log("BROWSERLESS", "Подключение к удаленному браузеру")
         
-        add_log("SUCCESS", f"Задача создана для {google_email}")
-        add_log("SUCCESS", f"Прокси {proxy_host}:{proxy_port} работает корректно")
+        if proxy_username and proxy_password:
+            proxy_str = f'{proxy_username}:{proxy_password}@{proxy_host}:{proxy_port}'
+        else:
+            proxy_str = f'{proxy_host}:{proxy_port}'
+        
+        chrome_options = webdriver.ChromeOptions()
+        chrome_options.add_argument(f'--proxy-server=socks5://{proxy_str}')
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        chrome_options.add_experimental_option('useAutomationExtension', False)
+        
+        browserless_url = f'https://chrome.browserless.io/webdriver?token={browserless_key}'
+        add_log("BROWSERLESS", f"Создание сессии браузера")
+        
+        driver = webdriver.Remote(
+            command_executor=browserless_url,
+            options=chrome_options
+        )
+        
+        driver.set_page_load_timeout(60)
+        wait = WebDriverWait(driver, 15)
+        
+        add_log("BROWSER", "Браузер запущен успешно")
+        
+        add_log("GOOGLE", "Переход на страницу входа Google")
+        driver.get('https://accounts.google.com/signin')
+        time.sleep(random.uniform(2, 4))
+        
+        add_log("GOOGLE", "Ввод email")
+        email_input = wait.until(EC.presence_of_element_located((By.ID, 'identifierId')))
+        email_input.send_keys(google_email)
+        time.sleep(random.uniform(1, 2))
+        
+        add_log("GOOGLE", "Клик на кнопку 'Далее'")
+        next_button = driver.find_element(By.ID, 'identifierNext')
+        next_button.click()
+        time.sleep(random.uniform(3, 5))
+        
+        try:
+            add_log("GOOGLE", "Ожидание поля пароля")
+            password_input = wait.until(EC.presence_of_element_located((By.NAME, 'Passwd')))
+            
+            add_log("GOOGLE", "Ввод пароля")
+            password_input.send_keys(google_password)
+            time.sleep(random.uniform(1, 2))
+            
+            add_log("GOOGLE", "Клик на кнопку входа")
+            password_next = driver.find_element(By.ID, 'passwordNext')
+            password_next.click()
+            time.sleep(random.uniform(4, 6))
+            add_log("GOOGLE", "Успешный вход в Google")
+        except TimeoutException:
+            add_log("ERROR", "Google требует 2FA или капчу")
+            driver.quit()
+            return {
+                'success': False,
+                'error': 'Google требует дополнительную проверку (2FA/капча)',
+                'logs': logs
+            }
+        
+        add_log("MARKTPLAATS", "Переход на Marktplaats.nl")
+        driver.get('https://www.marktplaats.nl')
+        time.sleep(random.uniform(3, 5))
+        
+        try:
+            add_log("MARKTPLAATS", "Поиск кнопки входа")
+            login_btn = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Inloggen')] | //a[contains(text(), 'Inloggen')]")))
+            add_log("MARKTPLAATS", "Клик на кнопку входа")
+            login_btn.click()
+            time.sleep(random.uniform(2, 3))
+        except:
+            add_log("MARKTPLAATS", "Кнопка входа не найдена, возможно уже авторизован")
+        
+        try:
+            add_log("MARKTPLAATS", "Поиск кнопки 'Войти через Google'")
+            google_btn = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Google')] | //*[contains(@aria-label, 'Google')]")))
+            add_log("MARKTPLAATS", "Клик на кнопку Google")
+            google_btn.click()
+            time.sleep(random.uniform(5, 7))
+            add_log("MARKTPLAATS", "Авторизация через Google завершена")
+        except TimeoutException:
+            add_log("ERROR", "Кнопка Google не найдена на Marktplaats")
+            driver.quit()
+            return {
+                'success': False,
+                'error': 'Не найдена кнопка входа через Google',
+                'logs': logs
+            }
+        
+        add_log("SUCCESS", "Получение cookies")
+        cookies = driver.get_cookies()
+        cookies_json = json.dumps(cookies)
+        
+        current_url = driver.current_url
+        page_title = driver.title
+        
+        add_log("SUCCESS", f"Регистрация завершена. URL: {current_url}")
+        
+        driver.quit()
         
         return {
+            'success': True,
+            'cookies': cookies_json,
+            'url': current_url,
+            'title': page_title,
+            'message': f'Регистрация завершена успешно через {proxy_host}:{proxy_port}',
+            'logs': logs
+        }
+        
+    except TimeoutException:
+        add_log("ERROR", "Timeout при ожидании элемента")
+        if driver:
+            driver.quit()
+        return {
             'success': False,
-            'error': 'Автоматизация браузера требует отдельного сервиса. Прокси работает корректно.',
+            'error': 'Timeout: элемент не найден или страница не загрузилась',
             'logs': logs
         }
     except Exception as e:
         add_log("ERROR", f"Исключение: {str(e)[:200]}")
+        if driver:
+            try:
+                driver.quit()
+            except:
+                pass
         
         error_msg = str(e)
         if 'net::ERR_PROXY_CONNECTION_FAILED' in error_msg or 'NS_ERROR_PROXY_CONNECTION_REFUSED' in error_msg:
