@@ -280,8 +280,8 @@ def process_registration_real(google_email: str, google_password: str,
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option('useAutomationExtension', False)
         
-        browserless_url = f'https://chrome.browserless.io/webdriver?token={browserless_key}'
-        add_log("BROWSERLESS", f"Создание сессии браузера")
+        browserless_url = f'https://production-sfo.browserless.io/webdriver?token={browserless_key}'
+        add_log("BROWSERLESS", f"Создание сессии браузера через {browserless_url[:50]}...")
         
         driver = webdriver.Remote(
             command_executor=browserless_url,
