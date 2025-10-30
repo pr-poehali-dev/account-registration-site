@@ -7,7 +7,6 @@ import random
 import string
 import requests
 import time
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     '''
@@ -252,125 +251,47 @@ def process_registration_real(google_email: str, google_password: str,
         add_log("INIT", f"Начало регистрации для {google_email} через {proxy_host}:{proxy_port}")
         
         if proxy_username and proxy_password:
-            proxy_config = {
-                'server': f'socks5://{proxy_host}:{proxy_port}',
-                'username': proxy_username,
-                'password': proxy_password
-            }
+            proxy_url = f'socks5://{proxy_username}:{proxy_password}@{proxy_host}:{proxy_port}'
             add_log("PROXY", f"Подключение через прокси с авторизацией")
         else:
-            proxy_config = {
-                'server': f'socks5://{proxy_host}:{proxy_port}'
-            }
+            proxy_url = f'socks5://{proxy_host}:{proxy_port}'
             add_log("PROXY", f"Подключение через прокси без авторизации")
         
-        with sync_playwright() as p:
-            add_log("BROWSER", "Запуск браузера Chrome")
-            browser = p.chromium.launch(
-                headless=True,
-                args=[
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-blink-features=AutomationControlled'
-                ]
-            )
-            
-            add_log("CONTEXT", "Создание контекста браузера")
-            context = browser.new_context(
-                proxy=proxy_config,
-                viewport={'width': 1920, 'height': 1080},
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            )
-            
-            page = context.new_page()
-            page.set_default_timeout(60000)
-            
-            add_log("GOOGLE", "Переход на страницу входа Google")
-            page.goto('https://accounts.google.com/signin', wait_until='domcontentloaded')
-            time.sleep(random.uniform(2, 4))
-            
-            add_log("GOOGLE", "Ввод email")
-            email_input = page.wait_for_selector('#identifierId', timeout=15000)
-            email_input.fill(google_email)
-            time.sleep(random.uniform(1, 2))
-            
-            add_log("GOOGLE", "Клик на кнопку 'Далее'")
-            page.click('#identifierNext')
-            time.sleep(random.uniform(3, 5))
-            
-            try:
-                add_log("GOOGLE", "Ожидание поля пароля")
-                password_input = page.wait_for_selector('input[name="Passwd"]', timeout=15000)
-                
-                add_log("GOOGLE", "Ввод пароля")
-                password_input.fill(google_password)
-                time.sleep(random.uniform(1, 2))
-                
-                add_log("GOOGLE", "Клик на кнопку входа")
-                page.click('#passwordNext')
-                time.sleep(random.uniform(4, 6))
-                add_log("GOOGLE", "Успешный вход в Google")
-            except PlaywrightTimeout:
-                add_log("ERROR", "Google требует 2FA или капчу")
-                return {
-                    'success': False,
-                    'error': 'Google требует дополнительную проверку (2FA или капча)',
-                    'logs': logs
-                }
-            
-            add_log("MARKTPLAATS", "Переход на Marktplaats.nl")
-            page.goto('https://www.marktplaats.nl', wait_until='domcontentloaded')
-            time.sleep(random.uniform(3, 5))
-            
-            try:
-                add_log("MARKTPLAATS", "Поиск кнопки входа")
-                login_btn = page.wait_for_selector('button:has-text("Inloggen"), a:has-text("Inloggen")', timeout=10000)
-                add_log("MARKTPLAATS", "Клик на кнопку входа")
-                login_btn.click()
-                time.sleep(random.uniform(2, 3))
-            except:
-                add_log("MARKTPLAATS", "Кнопка входа не найдена, возможно уже авторизован")
-                pass
-            
-            try:
-                add_log("MARKTPLAATS", "Поиск кнопки 'Войти через Google'")
-                google_btn = page.wait_for_selector('button:has-text("Google"), [aria-label*="Google"]', timeout=15000)
-                add_log("MARKTPLAATS", "Клик на кнопку Google")
-                google_btn.click()
-                time.sleep(random.uniform(5, 7))
-                add_log("MARKTPLAATS", "Авторизация через Google завершена")
-            except PlaywrightTimeout:
-                add_log("ERROR", "Кнопка Google не найдена на Marktplaats")
-                return {
-                    'success': False,
-                    'error': 'Не найдена кнопка входа через Google на Marktplaats',
-                    'logs': logs
-                }
-            
-            add_log("SUCCESS", "Получение cookies")
-            cookies = context.cookies()
-            cookies_json = json.dumps(cookies)
-            
-            current_url = page.url
-            page_title = page.title()
-            
-            add_log("SUCCESS", f"Регистрация завершена. URL: {current_url}")
-            
+        proxies = {
+            'http': proxy_url,
+            'https': proxy_url
+        }
+        
+        session = requests.Session()
+        session.proxies.update(proxies)
+        session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        })
+        
+        add_log("PROXY", "Проверка подключения через прокси")
+        try:
+            response = session.get('https://api.ipify.org?format=json', timeout=10)
+            proxy_ip = response.json().get('ip')
+            add_log("PROXY", f"Подключено через IP: {proxy_ip}")
+        except Exception as e:
+            add_log("ERROR", f"Ошибка подключения к прокси: {str(e)[:100]}")
             return {
-                'success': True,
-                'cookies': cookies_json,
-                'url': current_url,
-                'title': page_title,
-                'message': f'Регистрация завершена успешно через прокси {proxy_host}:{proxy_port}',
+                'success': False,
+                'error': f'Не удалось подключиться к прокси {proxy_host}:{proxy_port}',
                 'logs': logs
             }
-            
-    except PlaywrightTimeout:
-        add_log("ERROR", "Timeout при ожидании элемента")
+        
+        add_log("BROWSER", "Инициализация автоматизации")
+        add_log("INFO", "⚠️ Для полной автоматизации требуется браузер (Playwright/Selenium)")
+        add_log("INFO", "Cloud Functions не поддерживают браузерную автоматизацию")
+        add_log("INFO", "Решение: запустить локальный сервис автоматизации или использовать Browserless")
+        
+        add_log("SUCCESS", f"Задача создана для {google_email}")
+        add_log("SUCCESS", f"Прокси {proxy_host}:{proxy_port} работает корректно")
+        
         return {
             'success': False,
-            'error': 'Timeout: элемент не найден или страница не загрузилась',
+            'error': 'Автоматизация браузера требует отдельного сервиса. Прокси работает корректно.',
             'logs': logs
         }
     except Exception as e:
