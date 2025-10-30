@@ -267,21 +267,27 @@ def process_registration_real(google_email: str, google_password: str,
         
         add_log("BROWSERLESS", "Подключение к удаленному браузеру")
         
-        if proxy_username and proxy_password:
-            proxy_str = f'{proxy_username}:{proxy_password}@{proxy_host}:{proxy_port}'
-        else:
-            proxy_str = f'{proxy_host}:{proxy_port}'
-        
         chrome_options = webdriver.ChromeOptions()
-        chrome_options.add_argument(f'--proxy-server=socks5://{proxy_str}')
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-blink-features=AutomationControlled')
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option('useAutomationExtension', False)
         
+        proxy_config = {
+            'server': f'socks5://{proxy_host}:{proxy_port}'
+        }
+        if proxy_username and proxy_password:
+            proxy_config['username'] = proxy_username
+            proxy_config['password'] = proxy_password
+            add_log("BROWSERLESS", f"Прокси с авторизацией: {proxy_host}:{proxy_port}")
+        else:
+            add_log("BROWSERLESS", f"Прокси без авторизации: {proxy_host}:{proxy_port}")
+        
+        chrome_options.set_capability('browserless:proxy', proxy_config)
+        
         browserless_url = f'https://production-sfo.browserless.io/webdriver?token={browserless_key}'
-        add_log("BROWSERLESS", f"Создание сессии браузера через {browserless_url[:50]}...")
+        add_log("BROWSERLESS", f"Создание сессии браузера")
         
         driver = webdriver.Remote(
             command_executor=browserless_url,
