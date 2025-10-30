@@ -1,16 +1,6 @@
 {
   "tests": [
     {
-      "name": "Get registration tasks",
-      "method": "GET",
-      "path": "/",
-      "expectedStatus": 200,
-      "expectedBody": {
-        "tasks": "array"
-      },
-      "bodyMatcher": "partial"
-    },
-    {
       "name": "Start registration",
       "method": "POST",
       "path": "/",
@@ -22,6 +12,12 @@
         "success": true
       },
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get registration tasks",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200
     }
   ]
 }

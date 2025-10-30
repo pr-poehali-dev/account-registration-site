@@ -16,6 +16,8 @@ export const RegistrationTab = () => {
 
   useEffect(() => {
     loadTasks();
+    const interval = setInterval(loadTasks, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   const loadTasks = async () => {
@@ -244,7 +246,7 @@ export const RegistrationTab = () => {
                               : 'outline'
                           }
                         >
-                          {task.status === 'pending' && 'Ожидание'}
+                          {(task.status === 'pending' || task.status === 'waiting') && 'Ожидание'}
                           {task.status === 'processing' && 'Обработка'}
                           {task.status === 'completed' && 'Завершено'}
                           {task.status === 'failed' && 'Ошибка'}

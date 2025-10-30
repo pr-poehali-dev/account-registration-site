@@ -72,17 +72,17 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 SELECT ga.id, p.id 
                 FROM t_p24911867_account_registration.google_accounts ga
                 CROSS JOIN t_p24911867_account_registration.proxies p
-                WHERE ga.status = 'active' 
+                WHERE (ga.status = 'active' OR ga.status = 'ready')
                 AND p.status = 'active'
                 AND NOT EXISTS (
                     SELECT 1 FROM t_p24911867_account_registration.registration_tasks rt 
                     WHERE rt.google_account_id = ga.id 
-                    AND rt.status IN ('pending', 'processing', 'completed')
+                    AND rt.status IN ('waiting', 'processing', 'completed')
                 )
                 AND NOT EXISTS (
                     SELECT 1 FROM t_p24911867_account_registration.registration_tasks rt 
                     WHERE rt.proxy_id = p.id 
-                    AND rt.status IN ('pending', 'processing', 'completed')
+                    AND rt.status IN ('waiting', 'processing', 'completed')
                 )
                 LIMIT 10
             ''')
@@ -92,8 +92,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 marktplaats_login = generate_username()
                 marktplaats_password = generate_password()
                 cur.execute(
-                    'INSERT INTO t_p24911867_account_registration.registration_tasks (google_account_id, proxy_id, marktplaats_login, marktplaats_password, status) VALUES (%s, %s, %s, %s, %s)',
-                    (google_id, proxy_id, marktplaats_login, marktplaats_password, 'pending')
+                    'INSERT INTO t_p24911867_account_registration.registration_tasks (google_account_id, proxy_id, marktplaats_login, marktplaats_password) VALUES (%s, %s, %s, %s)',
+                    (google_id, proxy_id, marktplaats_login, marktplaats_password)
                 )
             
             conn.commit()
