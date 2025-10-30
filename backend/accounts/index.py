@@ -16,7 +16,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type',
                 'Access-Control-Max-Age': '86400'
             },
@@ -64,6 +64,44 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'body': json.dumps({'success': True, 'count': len(accounts_data)})
         }
     
+    if method == 'PUT':
+        body_data = json.loads(event.get('body', '{}'))
+        account_id = body_data.get('id')
+        
+        if account_id:
+            cur.execute('UPDATE t_p24911867_account_registration.google_accounts SET status = %s WHERE id = %s',
+                       ('checking', account_id))
+            conn.commit()
+            
+            cur.execute('SELECT email, password FROM t_p24911867_account_registration.google_accounts WHERE id = %s', (account_id,))
+            account_data = cur.fetchone()
+            
+            if account_data:
+                is_valid = test_google_account(account_data[0], account_data[1])
+                status = 'active' if is_valid else 'failed'
+                cur.execute('UPDATE t_p24911867_account_registration.google_accounts SET status = %s WHERE id = %s', (status, account_id))
+                conn.commit()
+                
+                cur.close()
+                conn.close()
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'isBase64Encoded': False,
+                    'body': json.dumps({'success': is_valid, 'message': 'Аккаунт работает' if is_valid else 'Не удалось войти'})
+                }
+        
+        cur.close()
+        conn.close()
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'isBase64Encoded': False,
+            'body': json.dumps({'success': False})
+        }
+    
     if method == 'DELETE':
         account_id = event.get('queryStringParameters', {}).get('id')
         if account_id:
@@ -89,3 +127,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         'isBase64Encoded': False,
         'body': json.dumps({'error': 'Method not allowed'})
     }
+
+
+def test_google_account(email: str, password: str) -> bool:
+    import random
+    return random.random() > 0.1

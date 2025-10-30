@@ -50,6 +50,14 @@ export const api = {
         body: JSON.stringify({ accounts }),
       });
     },
+    test: async (id: number): Promise<{ success: boolean; message?: string }> => {
+      const response = await fetch(API_URLS.accounts, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      return response.json();
+    },
     delete: async (id: number): Promise<void> => {
       await fetch(`${API_URLS.accounts}?id=${id}`, {
         method: 'DELETE',

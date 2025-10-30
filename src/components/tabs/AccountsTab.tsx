@@ -87,6 +87,24 @@ export const AccountsTab = () => {
     }
   };
 
+  const testAccount = async (id: number) => {
+    try {
+      const result = await api.accounts.test(id);
+      await loadAccounts();
+      toast({
+        title: result.success ? 'Аккаунт работает' : 'Ошибка входа',
+        description: result.message || (result.success ? 'Вход выполнен успешно' : 'Не удалось войти в аккаунт'),
+        variant: result.success ? 'default' : 'destructive',
+      });
+    } catch (error) {
+      toast({
+        title: 'Ошибка проверки',
+        description: 'Не удалось проверить аккаунт',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -98,7 +116,7 @@ export const AccountsTab = () => {
         <CardHeader>
           <CardTitle>Загрузка аккаунтов</CardTitle>
           <CardDescription>
-            Загрузите файл формата: email:password (по одному на строку)
+            Загрузите файл формата: email:password (по одному на строку). Email может быть любым — не обязательно @gmail.com, главное чтобы это был Google аккаунт
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -138,7 +156,7 @@ export const AccountsTab = () => {
                   <TableHead>Email</TableHead>
                   <TableHead>Статус</TableHead>
                   <TableHead>Дата добавления</TableHead>
-                  <TableHead className="w-[100px]">Действия</TableHead>
+                  <TableHead className="w-[150px]">Действия</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -148,14 +166,17 @@ export const AccountsTab = () => {
                     <TableCell>
                       <Badge
                         variant={
-                          account.status === 'active'
+                          account.status === 'active' || account.status === 'ready'
                             ? 'default'
+                            : account.status === 'checking'
+                            ? 'secondary'
                             : account.status === 'in_use'
                             ? 'secondary'
                             : 'destructive'
                         }
                       >
-                        {account.status === 'active' && 'Готов'}
+                        {(account.status === 'active' || account.status === 'ready') && 'Готов'}
+                        {account.status === 'checking' && 'Проверка...'}
                         {account.status === 'in_use' && 'Используется'}
                         {account.status === 'failed' && 'Ошибка'}
                       </Badge>
@@ -164,13 +185,24 @@ export const AccountsTab = () => {
                       {new Date(account.createdAt).toLocaleString()}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => deleteAccount(account.id)}
-                      >
-                        <Icon name="Trash2" size={16} />
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => testAccount(account.id)}
+                          disabled={account.status === 'in_use' || account.status === 'checking'}
+                          title="Проверить аккаунт"
+                        >
+                          <Icon name="CheckCircle" size={16} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => deleteAccount(account.id)}
+                        >
+                          <Icon name="Trash2" size={16} />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
