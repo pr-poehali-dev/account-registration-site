@@ -243,9 +243,6 @@ def generate_password() -> str:
 def process_registration_real(google_email: str, google_password: str, 
                               proxy_host: str, proxy_port: str, proxy_username: str, proxy_password: str,
                               marktplaats_login: str, marktplaats_password: str) -> Dict[str, Any]:
-    browser = None
-    context = None
-    page = None
     logs = []
     
     def add_log(step: str, message: str):
@@ -253,22 +250,22 @@ def process_registration_real(google_email: str, google_password: str,
         print(f"LOG: [{step}] {message}")
     
     try:
+        add_log("INIT", f"Начало регистрации для {google_email} через {proxy_host}:{proxy_port}")
+        
+        if proxy_username and proxy_password:
+            proxy_config = {
+                'server': f'socks5://{proxy_host}:{proxy_port}',
+                'username': proxy_username,
+                'password': proxy_password
+            }
+            add_log("PROXY", f"Подключение через прокси с авторизацией")
+        else:
+            proxy_config = {
+                'server': f'socks5://{proxy_host}:{proxy_port}'
+            }
+            add_log("PROXY", f"Подключение через прокси без авторизации")
+        
         with sync_playwright() as p:
-            add_log("INIT", f"Начало регистрации для {google_email} через {proxy_host}:{proxy_port}")
-            
-            if proxy_username and proxy_password:
-                proxy_config = {
-                    'server': f'socks5://{proxy_host}:{proxy_port}',
-                    'username': proxy_username,
-                    'password': proxy_password
-                }
-                add_log("PROXY", f"Подключение через прокси с авторизацией")
-            else:
-                proxy_config = {
-                    'server': f'socks5://{proxy_host}:{proxy_port}'
-                }
-                add_log("PROXY", f"Подключение через прокси без авторизации")
-            
             add_log("BROWSER", "Запуск браузера Chrome")
             browser = p.chromium.launch(
                 headless=True,
@@ -361,9 +358,6 @@ def process_registration_real(google_email: str, google_password: str,
             
             add_log("SUCCESS", f"Регистрация завершена. URL: {current_url}")
             
-            context.close()
-            browser.close()
-            
             return {
                 'success': True,
                 'cookies': cookies_json,
@@ -375,10 +369,6 @@ def process_registration_real(google_email: str, google_password: str,
             
     except PlaywrightTimeout:
         add_log("ERROR", "Timeout при ожидании элемента")
-        if context:
-            context.close()
-        if browser:
-            browser.close()
         return {
             'success': False,
             'error': 'Timeout: элемент не найден или страница не загрузилась',
@@ -386,16 +376,6 @@ def process_registration_real(google_email: str, google_password: str,
         }
     except Exception as e:
         add_log("ERROR", f"Исключение: {str(e)[:200]}")
-        if context:
-            try:
-                context.close()
-            except:
-                pass
-        if browser:
-            try:
-                browser.close()
-            except:
-                pass
         
         error_msg = str(e)
         if 'net::ERR_PROXY_CONNECTION_FAILED' in error_msg or 'NS_ERROR_PROXY_CONNECTION_REFUSED' in error_msg:
