@@ -8,7 +8,6 @@ import string
 import requests
 import time
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
-import asyncio
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     '''
