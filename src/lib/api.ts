@@ -38,9 +38,16 @@ export interface RegistrationTask {
 }
 
 async function fetchWithErrorHandling(url: string, options?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 секунд таймаут
+
   try {
     console.log(`[API] Запрос: ${options?.method || 'GET'} ${url}`);
-    const response = await fetch(url, options);
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
     console.log(`[API] Ответ: ${response.status} ${response.statusText}`);
     if (!response.ok) {
       const errorText = await response.text();
@@ -49,7 +56,14 @@ async function fetchWithErrorHandling(url: string, options?: RequestInit): Promi
     }
     return response;
   } catch (error) {
-    console.error('[API] Исключение:', error);
+    clearTimeout(timeoutId);
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        console.error('[API] Таймаут запроса (30 сек)');
+        throw new Error('Превышено время ожидания ответа от сервера');
+      }
+      console.error('[API] Ошибка:', error.message);
+    }
     throw error;
   }
 }

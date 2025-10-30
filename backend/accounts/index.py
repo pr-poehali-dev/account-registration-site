@@ -10,6 +10,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     Returns: HTTP response с данными аккаунтов
     '''
     method: str = event.get('httpMethod', 'GET')
+    print(f"[ACCOUNTS] Method: {method}, Headers: {event.get('headers', {})}")
     
     if method == 'OPTIONS':
         return {
