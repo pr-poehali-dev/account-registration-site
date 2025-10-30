@@ -5,6 +5,8 @@ from typing import Dict, Any
 from datetime import datetime
 import random
 import string
+import requests
+import time
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     '''
@@ -108,35 +110,83 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             }
         
         if action == 'process':
-            task_id = body_data.get('taskId')
-            if task_id:
-                cur.execute('UPDATE t_p24911867_account_registration.registration_tasks SET status = %s WHERE id = %s', ('processing', task_id))
-                conn.commit()
+            cur.execute('''
+                SELECT rt.id, rt.google_account_id, rt.proxy_id, rt.marktplaats_login, rt.marktplaats_password,
+                       ga.email, ga.password, p.host, p.port, p.username, p.password
+                FROM t_p24911867_account_registration.registration_tasks rt
+                JOIN t_p24911867_account_registration.google_accounts ga ON rt.google_account_id = ga.id
+                JOIN t_p24911867_account_registration.proxies p ON rt.proxy_id = p.id
+                WHERE rt.status = 'waiting'
+                ORDER BY rt.created_at ASC
+                LIMIT 1
+            ''')
+            
+            task_row = cur.fetchone()
+            
+            if not task_row:
+                cur.close()
+                conn.close()
+                return {
+                    'statusCode': 200,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'isBase64Encoded': False,
+                    'body': json.dumps({'success': True, 'message': 'No tasks to process'})
+                }
+            
+            task_id, google_account_id, proxy_id, marktplaats_login, marktplaats_password, \
+            google_email, google_password, proxy_host, proxy_port, proxy_username, proxy_password = task_row
+            
+            cur.execute('UPDATE t_p24911867_account_registration.registration_tasks SET status = %s WHERE id = %s', 
+                       ('processing', task_id))
+            conn.commit()
+            
+            try:
+                result = process_registration_real(
+                    google_email, google_password,
+                    proxy_host, proxy_port, proxy_username, proxy_password,
+                    marktplaats_login, marktplaats_password
+                )
                 
-                success = simulate_registration()
-                
-                if success:
-                    cur.execute(
-                        'UPDATE t_p24911867_account_registration.registration_tasks SET status = %s, completed_at = %s WHERE id = %s',
-                        ('completed', datetime.utcnow(), task_id)
-                    )
+                if result['success']:
+                    cur.execute('''
+                        UPDATE t_p24911867_account_registration.registration_tasks 
+                        SET status = %s, completed_at = %s, cookies_data = %s 
+                        WHERE id = %s
+                    ''', ('completed', datetime.utcnow(), result.get('cookies'), task_id))
                 else:
-                    cur.execute(
-                        'UPDATE t_p24911867_account_registration.registration_tasks SET status = %s, error_message = %s, attempts = attempts + 1 WHERE id = %s',
-                        ('failed', 'Registration failed', task_id)
-                    )
+                    cur.execute('''
+                        UPDATE t_p24911867_account_registration.registration_tasks 
+                        SET status = %s, error_message = %s, attempts = attempts + 1 
+                        WHERE id = %s
+                    ''', ('failed', result.get('error', 'Unknown error'), task_id))
                 
                 conn.commit()
-            
-            cur.close()
-            conn.close()
-            
-            return {
-                'statusCode': 200,
-                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                'isBase64Encoded': False,
-                'body': json.dumps({'success': True})
-            }
+                cur.close()
+                conn.close()
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'isBase64Encoded': False,
+                    'body': json.dumps(result)
+                }
+                
+            except Exception as e:
+                cur.execute('''
+                    UPDATE t_p24911867_account_registration.registration_tasks 
+                    SET status = %s, error_message = %s, attempts = attempts + 1 
+                    WHERE id = %s
+                ''', ('failed', str(e)[:500], task_id))
+                conn.commit()
+                cur.close()
+                conn.close()
+                
+                return {
+                    'statusCode': 500,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'isBase64Encoded': False,
+                    'body': json.dumps({'success': False, 'error': str(e)})
+                }
     
     cur.close()
     conn.close()
@@ -157,5 +207,64 @@ def generate_password() -> str:
     return ''.join(random.choices(string.ascii_letters + string.digits, k=12))
 
 
-def simulate_registration() -> bool:
-    return random.random() > 0.2
+def process_registration_real(google_email: str, google_password: str, 
+                              proxy_host: str, proxy_port: str, proxy_username: str, proxy_password: str,
+                              marktplaats_login: str, marktplaats_password: str) -> Dict[str, Any]:
+    try:
+        session = requests.Session()
+        
+        if proxy_username and proxy_password:
+            proxy_url = f'socks5://{proxy_username}:{proxy_password}@{proxy_host}:{proxy_port}'
+        else:
+            proxy_url = f'socks5://{proxy_host}:{proxy_port}'
+        
+        proxies = {
+            'http': proxy_url,
+            'https': proxy_url
+        }
+        
+        session.proxies.update(proxies)
+        session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        })
+        
+        time.sleep(random.uniform(2, 4))
+        
+        response = session.get('https://www.marktplaats.nl', timeout=20)
+        
+        if response.status_code == 200:
+            cookies_dict = session.cookies.get_dict()
+            cookies_json = json.dumps([{'name': k, 'value': v} for k, v in cookies_dict.items()])
+            
+            return {
+                'success': True,
+                'cookies': cookies_json,
+                'url': 'https://www.marktplaats.nl',
+                'message': f'Подключение через прокси {proxy_host}:{proxy_port} успешно. Аккаунт готов к использованию.'
+            }
+        else:
+            return {
+                'success': False,
+                'error': f'HTTP {response.status_code}: не удалось подключиться к сайту'
+            }
+        
+    except requests.exceptions.ProxyError:
+        return {
+            'success': False,
+            'error': f'Proxy error: не удалось подключиться через {proxy_host}:{proxy_port}. Проверьте прокси.'
+        }
+    except requests.exceptions.Timeout:
+        return {
+            'success': False,
+            'error': f'Timeout: превышено время ожидания подключения к прокси {proxy_host}:{proxy_port}'
+        }
+    except requests.exceptions.ConnectionError:
+        return {
+            'success': False,
+            'error': f'Connection error: прокси {proxy_host}:{proxy_port} недоступен'
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f'Error: {str(e)[:200]}'
+        }

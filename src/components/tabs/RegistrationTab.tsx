@@ -36,6 +36,16 @@ export const RegistrationTab = () => {
   const startRegistration = async () => {
     try {
       const result = await api.registration.start();
+      
+      if (result.tasksCreated === 0) {
+        toast({
+          title: 'Нет задач',
+          description: 'Все аккаунты уже использованы или нет доступных прокси',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
       await loadTasks();
       
       setIsRunning(true);
@@ -43,30 +53,40 @@ export const RegistrationTab = () => {
 
       toast({
         title: 'Регистрация запущена',
-        description: `Создано ${result.tasksCreated} задач`,
+        description: `Создано ${result.tasksCreated} задач. Начинаю обработку...`,
       });
 
-      let currentProgress = 0;
-      const interval = setInterval(async () => {
-        currentProgress += 10;
-        setProgress(currentProgress);
-
-        if (currentProgress >= 100) {
-          clearInterval(interval);
-          setIsRunning(false);
-          await loadTasks();
-          toast({
-            title: 'Регистрация завершена',
-            description: 'Все аккаунты обработаны',
-          });
-        }
-      }, 1000);
+      processNextTask(result.tasksCreated);
     } catch (error) {
       toast({
         title: 'Ошибка',
         description: 'Не удалось запустить регистрацию',
         variant: 'destructive',
       });
+    }
+  };
+
+  const processNextTask = async (totalTasks: number) => {
+    try {
+      await api.registration.process(0);
+      await loadTasks();
+      
+      const processed = tasks.filter(t => t.status === 'completed' || t.status === 'failed').length;
+      const progressPercent = Math.round((processed / totalTasks) * 100);
+      setProgress(progressPercent);
+      
+      if (processed < totalTasks && isRunning) {
+        setTimeout(() => processNextTask(totalTasks), 2000);
+      } else {
+        setIsRunning(false);
+        toast({
+          title: 'Регистрация завершена',
+          description: `Обработано ${processed} из ${totalTasks} задач`,
+        });
+      }
+    } catch (error) {
+      console.error('Task processing error:', error);
+      setTimeout(() => processNextTask(totalTasks), 3000);
     }
   };
 
