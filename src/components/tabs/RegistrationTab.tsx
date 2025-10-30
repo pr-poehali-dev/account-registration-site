@@ -337,7 +337,7 @@ export const RegistrationTab = () => {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        {task.logs && task.logs.length > 0 && (
+                        {task.logs && (
                           <Dialog>
                             <DialogTrigger asChild>
                               <Button variant="outline" size="sm">
@@ -354,7 +354,7 @@ export const RegistrationTab = () => {
                               </DialogHeader>
                               <ScrollArea className="h-[400px] w-full rounded-md border p-4">
                                 <div className="space-y-2 font-mono text-xs">
-                                  {task.logs.map((log, idx) => (
+                                  {(Array.isArray(task.logs) ? task.logs : [task.logs]).map((log, idx) => (
                                     <div
                                       key={idx}
                                       className={`p-2 rounded ${
